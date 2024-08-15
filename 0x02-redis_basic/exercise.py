@@ -26,6 +26,28 @@ def count_calls(method: Callable) -> Callable:
     return invoker
 
 
+def call_history(method: Callable) -> Callable:
+    """Tracks the call details of a method in a Cache class.
+    """
+    @wraps(method)
+    def invoker(self, *args, **kwargs) -> Any:
+        """
+        returns the output of a method after storing its inputs and output.
+        """
+
+        input_key = "{}:inputs".format(method.__qualname__)
+        output_key = "{}:outputs".format(method.__qualname__)
+
+        output = method(self, *args, **kwargs)
+        if isinstance(self._redis, redis.Redis):
+            self._redis.rpush(input_key, str(args))
+            self._redis.rpush(output_key, output)
+
+        return output
+
+    return invoker
+
+
 class Cache:
     """
     serves as a simple cache by interacting with redis
