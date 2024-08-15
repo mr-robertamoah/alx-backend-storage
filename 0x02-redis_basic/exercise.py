@@ -27,7 +27,8 @@ def count_calls(method: Callable) -> Callable:
 
 
 def call_history(method: Callable) -> Callable:
-    """Tracks the call details of a method in a Cache class.
+    """
+    Tracks the history of inputs and outputs of a method in a Cache class
     """
     @wraps(method)
     def invoker(self, *args, **kwargs) -> Any:
@@ -48,6 +49,40 @@ def call_history(method: Callable) -> Callable:
     return invoker
 
 
+def replay(fn: Callable) -> None:
+    """
+    Displays the history of inputs and outputs
+    used to call a Cache class method
+    """
+    if fn is None or not hasattr(fn, "__self__"):
+        return
+
+    redis_store = getattr(fn.__self__, "_redis", None)
+
+    if not isinstance(redis_store, redis.Redis):
+        return
+
+    qualname = fn.__qualname__
+    func_call_count = 0
+
+    if redis_store.exists(qualname) != 0:
+        func_call_count = int(redis_store.get(qualname))
+
+    print("{} was called {} times:".format(qualname, func_call_count))
+
+    input_key = "{}:inputs".format(qualname)
+    output_key = "{}:outputs".format(qualname)
+    func_inputs = redis_store.lrange(input_key, 0, -1)
+    func_outputs = redis_store.lrange(output_key, 0, -1)
+
+    for func_input, func_output in zip(func_inputs, func_outputs):
+        print("{}(*{}) -> {}".format(
+            qualname,
+            func_input.decode("utf-8"),
+            func_output,
+        ))
+
+
 class Cache:
     """
     serves as a simple cache by interacting with redis
@@ -60,6 +95,7 @@ class Cache:
         self._redis = redis.Redis()
         self._redis.flushdb(True)
 
+    @call_history
     @count_calls
     def store(self, data: Union[str, bytes, int, float]) -> str:
         """
