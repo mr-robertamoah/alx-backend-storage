@@ -4,9 +4,26 @@ contains a Cache class
 """
 
 
-from typing import Union, Callable
+from typing import Any, Callable, Union
 import redis
 import uuid
+from functools import wraps
+
+
+def count_calls(method: Callable) -> Callable:
+    """
+    Tracks the number of calls made to the store method in a Cache class
+    """
+    @wraps(method)
+    def invoker(self, *args, **kwargs) -> Any:
+        """
+        calls the given method after incrementing its call counter
+        """
+        if isinstance(self._redis, redis.Redis):
+            self._redis.incr(method.__qualname__)
+        return method(self, *args, **kwargs)
+
+    return invoker
 
 
 class Cache:
@@ -21,6 +38,7 @@ class Cache:
         self._redis = redis.Redis()
         self._redis.flushdb(True)
 
+    @count_calls
     def store(self, data: Union[str, bytes, int, float]) -> str:
         """
         Sets a key-value pair in a Redis and returns the key.
