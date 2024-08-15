@@ -4,7 +4,7 @@ contains a Cache class
 """
 
 
-from typing import Union
+from typing import Union, Callable
 import redis
 import uuid
 
